@@ -1,7 +1,7 @@
 package exercicios.semana4.ex1.v2;
 
-import versão2.Javali;
-import versão2.Mesa;
+import exercicios.semana4.ex1.v2.Javali;
+import exercicios.semana4.ex1.v2.Mesa;
 
 public class Gaules extends Thread{
 

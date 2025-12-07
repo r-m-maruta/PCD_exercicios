@@ -1,8 +1,8 @@
 package exercicios.semana4.ex1.v2;
 
-import versão2.Cozinheiro;
-import versão2.Gaules;
-import versão2.Javali;
+import exercicios.semana4.ex1.v2.Cozinheiro;
+import exercicios.semana4.ex1.v2.Gaules;
+import exercicios.semana4.ex1.v2.Javali;
 
 import java.util.ArrayList;
 import java.util.LinkedList;
