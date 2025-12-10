@@ -12,9 +12,12 @@ public class ClientChat extends JFrame {
     private JButton sendButton;
 
     private Socket socket;
-    private BufferedReader in;
-    private PrintWriter out;
+    private ObjectInputStream in;
+    private ObjectOutputStream out;
     private String username;
+
+    private DefaultListModel<String> usersModel = new DefaultListModel<>();
+    private JList<String> usersList = new JList<>(usersModel);
 
     public ClientChat(String username) {
         super("Chat - " + username);
@@ -35,6 +38,13 @@ public class ClientChat extends JFrame {
         sendButton.addActionListener(e -> sendMessage());
         textField.addActionListener(e -> sendMessage());
 
+        JButton clearSelection = new JButton("Todos");
+        clearSelection.addActionListener(e -> usersList.clearSelection());
+        JScrollPane listPane = new JScrollPane(usersList);
+        listPane.setPreferredSize(new Dimension(100, 300));
+        listPane.setColumnHeaderView(clearSelection);
+        add(listPane, BorderLayout.EAST);
+
         setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);
         pack();
         setVisible(true);
@@ -42,32 +52,59 @@ public class ClientChat extends JFrame {
 
     public void connect(String host, int port) throws IOException {
         socket = new Socket(host, port);
-        in = new BufferedReader(new InputStreamReader(socket.getInputStream()));
-        out = new PrintWriter(new BufferedWriter(new OutputStreamWriter(socket.getOutputStream())), true);
+        out = new ObjectOutputStream(socket.getOutputStream());
+        out.flush();
+        in = new ObjectInputStream(socket.getInputStream());
 
         // envia o username ao servidor
-        out.println(username);
+        out.writeObject(new Message("LOGIN", username, null, null));
+        out.flush();
 
         // Thread para ler mensagens do servidor
         new Thread(() -> {
-            String line;
             try {
-                while ((line = in.readLine()) != null) {
-                    textArea.append(line + "\n");
+                Message message;
+                while ((message = (Message) in.readObject()) != null) {
+                    if (message.getType().equals("USERS")) {
+                        updateUserList(message.getMessage());
+                    } else {
+                        textArea.append(message.getMessage() + "\n");
+                    }
                 }
-            } catch (IOException e) {
-                e.printStackTrace();
-            }
+            } catch (Exception igonored) {}
         }).start();
     }
 
     private void sendMessage() {
         String msg = textField.getText().trim();
-        if (!msg.isEmpty()) {
-            out.println(msg);
-            textField.setText("");
+        if (msg.isEmpty()) return;
+
+        String receiver = usersList.getSelectedValue();
+        try {
+            if (receiver == null) {
+                out.writeObject(new Message("PUBLIC", username, null, msg));
+                out.flush();
+            } else {
+                out.writeObject(new Message("PRIVATE", username, receiver, msg));
+                out.flush();
+                textArea.append("(Mensagem privada para " + receiver + "): " + msg + "\n");
+            }
+        } catch (IOException e) {
+            e.printStackTrace();
+        }
+
+        textField.setText("");
+    }
+
+    private void updateUserList(String users) {
+        usersModel.clear();
+        String[] arr = users.split(",");
+        for (String name : arr) {
+            if (!name.equals(username))
+                usersModel.addElement(name);
         }
     }
+
 
     public static void main(String[] args) throws IOException {
         String username = JOptionPane.showInputDialog("Nome do utilizador:");

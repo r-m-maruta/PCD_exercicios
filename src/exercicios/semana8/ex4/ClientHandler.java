@@ -5,32 +5,59 @@ import java.net.*;
 
 public class ClientHandler implements Runnable {
     private Socket socket;
-    private BufferedReader in;
-    private PrintWriter out;
+    private ObjectInputStream in;
+    private ObjectOutputStream out;
     private String username;
 
     public ClientHandler(Socket socket) {
-        this.socket = socket;
         try {
-            in = new BufferedReader(new InputStreamReader(socket.getInputStream()));
-            out = new PrintWriter(new BufferedWriter(new OutputStreamWriter(socket.getOutputStream())), true);
+            this.socket = socket;
+            out = new ObjectOutputStream(socket.getOutputStream());
+            in = new ObjectInputStream(socket.getInputStream());
+
             // Recebe o nome do cliente na primeira mensagem
-            username = in.readLine();
-            ServerChat.broadcast(username + " entrou no chat.");
+            Message firstMessage = (Message) in.readObject();
+            username = firstMessage.getSender();
+
+            ServerChat.broadcastUsers();
+
         } catch (IOException e) {
             e.printStackTrace();
+
+        } catch (ClassNotFoundException e) {
+            throw new RuntimeException(e);
         }
     }
 
     public void run() {
         try {
-            String line;
-            while ((line = in.readLine()) != null) {
-                if (line.equalsIgnoreCase("FIM")) break;
-                ServerChat.broadcast(username + ": " + line);
+            Message message;
+            while ((message = (Message) in.readObject()) != null) {
+
+                switch (message.getType()) {
+
+                    case "PRIVATE":
+                        ServerChat.sendPrivate(
+                                message.getSender(),
+                                message.getReceiver(),
+                                message.getMessage()
+                        );
+                        break;
+
+                    case "PUBLIC":
+                        ServerChat.broadcast(
+                                message.getSender() + ": " +  message.getMessage()
+                        );
+                        break;
+                }
+
             }
         } catch (IOException e) {
             e.printStackTrace();
+
+        } catch (ClassNotFoundException e) {
+            throw new RuntimeException(e);
+
         } finally {
             try {
                 socket.close();
@@ -40,7 +67,16 @@ public class ClientHandler implements Runnable {
         }
     }
 
-    public void sendMessage(String message) {
-        out.println(message);
+    public void sendMessage(Message message) {
+        try {
+            out.writeObject(message);
+            out.flush();
+        } catch (IOException e) {
+            e.printStackTrace();
+        }
+    }
+
+    public String getUsername(){
+        return username;
     }
 }
